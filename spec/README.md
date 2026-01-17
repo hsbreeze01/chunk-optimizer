@@ -38,110 +38,86 @@
 6. 提交代码
 ```
 
-## 文档列表
+## 文档结构
 
-### 001-core-system.md
+### Base 规约
 
-**描述**: 核心系统规格
+这些文档定义了项目的最高约束和开发范式：
 
-**内容**:
-- 项目概述和目标
-- 功能需求（质量分析、重复检测、大小分析、相似度计算）
-- API 需求
-- 客户端 SDK 需求
-- 性能要求
-- 部署要求
-- 测试要求
-- 版本计划
+| 文件 | 描述 | 优先级 |
+|------|------|---------|
+| [AGENT.md](../AGENT.md) | Agent 行为规约，定义 AI Agent 必须遵守的规则 | 最高 |
+| [system.spec.md](system.spec.md) | 系统规格，定义整个工程的最高约束与开发范式 | 最高 |
 
-**适用对象**: 所有开发者
+### 层级规约
 
-### 002-algorithms.md
+这些文档定义了各个层的职责、范围和约束：
 
-**描述**: 算法层规格
+| 文件 | 描述 | 适用对象 |
+|------|------|---------|
+| [algorithms.spec.md](layers/algorithms.spec.md) | 算法层规格 | 算法开发者 |
+| [api.spec.md](layers/api.spec.md) | API 层规格 | API 开发者 |
+| [core.spec.md](layers/core.spec.md) | 核心层规格 | 核心开发者 |
+| [client.spec.md](layers/client.spec.md) | 客户端 SDK 层规格 | SDK 开发者 |
 
-**内容**:
-- QualityAnalyzer（质量分析器）
-- RedundancyDetector（重复检测器）
-- SizeAnalyzer（大小分析器）
-- SimilarityCalculator（相似度计算器）
-- 算法集成（Optimizer）
-- 性能优化建议
-- 测试要求
-- 未来改进方向
+### 功能规格
 
-**适用对象**: 算法开发者
+这些文档详细描述了各个功能模块的实现细节：
 
-### 003-api-layer.md
+| 文件 | 描述 | 适用对象 |
+|------|------|---------|
+| [001-core-system.md](001-core-system.md) | 核心系统规格 | 所有开发者 |
+| [002-algorithms.md](002-algorithms.md) | 算法层详细规格 | 算法开发者 |
+| [003-api-layer.md](003-api-layer.md) | API 层详细规格 | API 开发者 |
+| [004-client-sdks.md](004-client-sdks.md) | 客户端 SDK 详细规格 | SDK 开发者 |
+| [005-development-guide.md](005-development-guide.md) | 开发指南 | 所有开发者 |
 
-**描述**: API 层规格
+## 优先级和权威性
 
-**内容**:
-- 基础信息（Base URL、版本、认证、限流）
-- 端点列表（健康检查、Chunk 分析、文档分析、批量分析、相似度计算）
-- 数据模型
-- 错误处理
-- 请求/响应头
-- 分页、排序、过滤
-- 性能要求
-- 安全性
-- 版本控制
-- 监控和日志
+### 权威性优先级
 
-**适用对象**: API 开发者、前端开发者
+Agent 必须遵守以下优先级顺序（无例外）：
 
-### 004-client-sdks.md
+1. `AGENT.md` (最高优先级)
+2. `spec/system.spec.md`
+3. `spec/layers/*.spec.md`
+4. `spec/modules/*.spec.md` (如有)
+5. `spec/00X-*.md` (功能规格)
+6. 现有源代码
 
-**描述**: 客户端 SDK 规格
+### 冲突处理
 
-**内容**:
-- Python SDK
-  - 数据模型
-  - 异步客户端（ChunkOptimizerClient）
-  - 同步客户端（SyncChunkOptimizerClient）
-  - 异常处理
-  - 使用示例
-- JavaScript/TypeScript SDK
-  - 数据模型
-  - 客户端实现（ChunkOptimizerClient）
-  - 异常处理
-  - 使用示例
-- 最佳实践
-- 性能优化
-- 测试
-- 未来扩展
+如果发现任何冲突：
 
-**适用对象**: SDK 开发者、集成开发者
+* **立即停止**
+* **报告冲突**
+* **不要猜测或自主解决**
 
-### 005-development-guide.md
+### 只读规则
 
-**描述**: 开发指南
+以下文件和目录是**严格只读**的：
 
-**内容**:
-- Spec-Driven 开发原则
-- 开发环境设置
-- 项目结构
-- 代码规范（Python 和 TypeScript）
-- 测试要求（单元测试、集成测试、性能测试）
-- Git 工作流程
-- 发布流程
-- 文档要求
-- 性能优化
-- 安全性
-- 监控和日志
-- 故障排查
-- 贡献指南
-- 资源和工具
+* `spec/**/*.spec.md`
+* `spec/**/*.md`
+* `AGENT.md`
 
-**适用对象**: 所有开发者
+Agent 必须**不**：
 
-## 如何使用 Spec
+* 修改 spec 文件
+* 重写 spec 措辞
+* "修复"或"改进" spec 定义
+
+任何 spec 变更需要**明确的人类指令**。
+
+## 如何使用 Spec 文档
 
 ### 开始新功能开发
 
 1. **阅读相关 spec 文档**
-   - 确定功能属于哪个模块
-   - 阅读对应的 spec 文档
+   - 首先阅读 [AGENT.md](../AGENT.md) 了解 Agent 行为规约
+   - 阅读 [system.spec.md](system.spec.md) 了解系统约束
+   - 阅读相关层级的 spec 文档
+   - 阅读功能规格文档
 
 2. **理解需求和约束**
    - 明确功能目标
@@ -202,47 +178,69 @@
    - 运行性能测试
    - 确保达到性能目标
 
-## Spec 更新流程
+## 层级架构
 
-### 何时需要更新 Spec
+### 系统架构
 
-1. **新增功能**
-   - 在实现前更新 spec
-   - 明确功能需求和约束
+```
+chunk-optimizer/
+├── AGENT.md                    # Agent 行为规约
+├── spec/
+│   ├── system.spec.md           # 系统规格
+│   ├── layers/                 # 层级规约
+│   │   ├── algorithms.spec.md   # 算法层
+│   │   ├── api.spec.md         # API 层
+│   │   ├── core.spec.md        # 核心层
+│   │   └── client.spec.md     # 客户端 SDK 层
+│   ├── 001-core-system.md       # 核心系统规格
+│   ├── 002-algorithms.md        # 算法层详细规格
+│   ├── 003-api-layer.md        # API 层详细规格
+│   ├── 004-client-sdks.md      # 客户端 SDK 详细规格
+│   ├── 005-development-guide.md # 开发指南
+│   └── README.md              # 本文件
+├── chunk-optimizer-service/      # 优化服务
+│   └── src/
+│       ├── algorithms/          # 算法层
+│       ├── api/               # API 层
+│       ├── core/              # 核心层
+│       ├── config/            # 配置
+│       ├── models/            # 数据模型
+│       └── utils/             # 工具函数
+├── chunk-optimizer-client/       # Python 客户端 SDK
+│   └── src/chunk_optimizer/
+└── chunk-optimizer-js-client/    # JavaScript/TypeScript 客户端 SDK
+    └── src/
+```
 
-2. **修改功能**
-   - 先更新 spec
-   - 再修改实现
+### 层级职责
 
-3. **调整性能要求**
-   - 更新 spec 中的性能指标
-   - 通知相关开发者
+#### Algorithms Layer
 
-4. **修复 Spec 错误**
-   - 立即更新 spec
-   - 说明变更原因
+* **职责**: 实现核心分析算法
+* **范围**: `chunk-optimizer-service/src/algorithms/`
+* **依赖**: 仅允许 Python 标准库
+* **禁止**: 访问 infrastructure、调用第三方 SDK、IO/网络/数据库
 
-### Spec 更新步骤
+#### API Layer
 
-1. **创建 Issue**
-   - 说明需要更新的内容
-   - 讨论变更影响
+* **职责**: 提供 RESTful API 接口
+* **范围**: `chunk-optimizer-service/src/api/`
+* **依赖**: core, algorithms
+* **禁止**: 直接访问数据库、直接调用第三方 API、包含业务规则
 
-2. **更新 Spec 文档**
-   - 修改对应的 spec 文件
-   - 保持格式一致
+#### Core Layer
 
-3. **提交 Pull Request**
-   - 标注为 spec 更新
-   - 说明变更原因
+* **职责**: 编排算法，生成优化建议
+* **范围**: `chunk-optimizer-service/src/core/`
+* **依赖**: algorithms
+* **禁止**: 直接访问数据库、直接调用第三方 API
 
-4. **代码审查**
-   - 确保变更合理
-   - 检查一致性
+#### Client SDK Layer
 
-5. **合并变更**
-   - 更新主分支
-   - 通知相关开发者
+* **职责**: 提供客户端 SDK
+* **范围**: `chunk-optimizer-client/src/` 或 `chunk-optimizer-js-client/src/`
+* **依赖**: httpx (Python), fetch (TypeScript)
+* **禁止**: 包含业务规则、直接访问数据库
 
 ## 常见问题
 
@@ -265,6 +263,14 @@
 ### Q: 如何判断功能是否在 spec 的 Scope 中？
 
 **A**: 阅读相关 spec 文档，查看功能需求部分。如果功能未在 spec 中声明，则不在 Scope 中。
+
+### Q: Agent 可以修改 spec 文件吗？
+
+**A**: 不可以。spec 文件是严格只读的。任何 spec 变更需要明确的人类指令。
+
+### Q: 如果用户请求与 spec 冲突怎么办？
+
+**A**: 立即停止，报告冲突，建议用户更新 spec 后再实现。不要猜测或自主解决冲突。
 
 ## 贡献指南
 
@@ -295,11 +301,17 @@
 
 ### 文档
 
-- [核心系统规格](001-core-system.md)
-- [算法层规格](002-algorithms.md)
-- [API 层规格](003-api-layer.md)
-- [客户端 SDK 规格](004-client-sdks.md)
-- [开发指南](005-development-guide.md)
+- [AGENT.md](../AGENT.md) - Agent 行为规约
+- [system.spec.md](system.spec.md) - 系统规格
+- [algorithms.spec.md](layers/algorithms.spec.md) - 算法层规格
+- [api.spec.md](layers/api.spec.md) - API 层规格
+- [core.spec.md](layers/core.spec.md) - 核心层规格
+- [client.spec.md](layers/client.spec.md) - 客户端 SDK 层规格
+- [001-core-system.md](001-core-system.md) - 核心系统规格
+- [002-algorithms.md](002-algorithms.md) - 算法层详细规格
+- [003-api-layer.md](003-api-layer.md) - API 层详细规格
+- [004-client-sdks.md](004-client-sdks.md) - 客户端 SDK 详细规格
+- [005-development-guide.md](005-development-guide.md) - 开发指南
 
 ### 工具
 
@@ -312,6 +324,17 @@
 - Discussions: https://github.com/hsbreeze01/chunk-optimizer/discussions
 
 ## 版本历史
+
+### v0.2.0 (2024-01-17)
+
+- 添加 AGENT.md - Agent 行为规约
+- 添加 spec/system.spec.md - 系统规格
+- 添加 spec/layers/ 目录 - 层级规约
+- 添加 algorithms.spec.md - 算法层规格
+- 添加 api.spec.md - API 层规格
+- 添加 core.spec.md - 核心层规格
+- 添加 client.spec.md - 客户端 SDK 层规格
+- 更新 README.md - 添加 base 规约说明
 
 ### v0.1.0 (2024-01-17)
 
