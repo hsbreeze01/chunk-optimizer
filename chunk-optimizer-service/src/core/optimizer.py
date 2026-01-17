@@ -1,0 +1,219 @@
+"""Optimization engine"""
+import uuid
+from datetime import datetime
+from typing import List, Optional, Dict, Any
+from loguru import logger
+
+from ..api.rest.schemas import (
+    Optimization,
+    Metrics,
+    Chunk,
+    AnalysisOptions,
+    OptimizationResponse,
+    OptimizationListResponse,
+    BatchOptimizationResponse,
+    BatchItem
+)
+from ..algorithms.quality_analyzer import QualityAnalyzer
+from ..algorithms.redundancy_detector import RedundancyDetector
+from ..algorithms.size_analyzer import SizeAnalyzer
+from ..algorithms.similarity_calculator import SimilarityCalculator
+
+
+class Optimizer:
+    """Chunk optimization engine"""
+    
+    def __init__(self):
+        self.quality_analyzer = QualityAnalyzer()
+        self.redundancy_detector = RedundancyDetector()
+        self.size_analyzer = SizeAnalyzer()
+        self.similarity_calculator = SimilarityCalculator()
+    
+    async def analyze_chunk(
+        self,
+        chunk_id: str,
+        content: str,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> OptimizationResponse:
+        """Analyze a single chunk"""
+        logger.info(f"Analyzing chunk: {chunk_id}")
+        
+        metrics = self._calculate_metrics(chunk_id, content)
+        optimizations = self._generate_optimizations(chunk_id, content, metrics)
+        
+        return OptimizationResponse(
+            optimization=optimizations[0] if optimizations else self._create_empty_optimization(chunk_id),
+            metrics=metrics
+        )
+    
+    async def analyze_document(
+        self,
+        document_id: str,
+        chunks: List[Chunk],
+        options: Optional[AnalysisOptions] = None
+    ) -> OptimizationListResponse:
+        """Analyze all chunks in a document"""
+        logger.info(f"Analyzing document: {document_id} with {len(chunks)} chunks")
+        
+        options = options or AnalysisOptions()
+        all_optimizations = []
+        high_priority_count = 0
+        
+        for chunk in chunks:
+            metrics = self._calculate_metrics(chunk.chunk_id, chunk.content)
+            optimizations = self._generate_optimizations(
+                chunk.chunk_id,
+                chunk.content,
+                metrics,
+                options
+            )
+            
+            for opt in optimizations:
+                if opt.priority == "high":
+                    high_priority_count += 1
+                all_optimizations.append(opt)
+        
+        return OptimizationListResponse(
+            optimizations=all_optimizations,
+            total=len(all_optimizations),
+            high_priority=high_priority_count
+        )
+    
+    async def analyze_batch(
+        self,
+        batch_id: str,
+        items: List[BatchItem],
+        options: Optional[AnalysisOptions] = None
+    ) -> BatchOptimizationResponse:
+        """Batch analyze chunks"""
+        logger.info(f"Analyzing batch: {batch_id} with {len(items)} items")
+        
+        options = options or AnalysisOptions()
+        processed = 0
+        results = []
+        
+        for item in items:
+            metrics = self._calculate_metrics(item.chunk_id, item.content)
+            optimizations = self._generate_optimizations(
+                item.chunk_id,
+                item.content,
+                metrics,
+                options
+            )
+            
+            for opt in optimizations:
+                results.append(BatchOptimizationResponse(
+                    batch_id=batch_id,
+                    item_id=item.chunk_id,
+                    optimization=opt,
+                    processed=processed + 1,
+                    total=len(items)
+                ))
+            
+            processed += 1
+        
+        return results[0] if results else BatchOptimizationResponse(
+            batch_id=batch_id,
+            item_id="",
+            optimization=None,
+            processed=0,
+            total=len(items)
+        )
+    
+    def _calculate_metrics(self, chunk_id: str, content: str) -> Metrics:
+        """Calculate quality metrics for a chunk"""
+        quality_score = self.quality_analyzer.analyze(content)
+        redundancy_score = self.redundancy_detector.analyze(content)
+        size_score = self.size_analyzer.analyze(content)
+        similarity_score = self.similarity_calculator.analyze(content)
+        
+        overall_score = (
+            quality_score * 0.4 +
+            (1 - redundancy_score) * 0.3 +
+            size_score * 0.2 +
+            (1 - similarity_score) * 0.1
+        )
+        
+        return Metrics(
+            chunk_id=chunk_id,
+            quality_score=quality_score,
+            redundancy_score=redundancy_score,
+            size_score=size_score,
+            similarity_score=similarity_score,
+            overall_score=overall_score
+        )
+    
+    def _generate_optimizations(
+        self,
+        chunk_id: str,
+        content: str,
+        metrics: Metrics,
+        options: Optional[AnalysisOptions] = None
+    ) -> List[Optimization]:
+        """Generate optimization suggestions based on metrics"""
+        options = options or AnalysisOptions()
+        optimizations = []
+        
+        if options.check_quality and metrics.quality_score < 0.6:
+            optimizations.append(Optimization(
+                id=str(uuid.uuid4()),
+                chunk_id=chunk_id,
+                type="quality",
+                priority="high" if metrics.quality_score < 0.4 else "medium",
+                title="Chunk quality needs improvement",
+                description=f"Quality score is {metrics.quality_score:.2f}, which is below the recommended threshold of 0.6",
+                suggested_action="Review and rewrite the chunk to improve clarity, coherence, and completeness",
+                created_at=datetime.utcnow()
+            ))
+        
+        if options.check_redundancy and metrics.redundancy_score > 0.5:
+            optimizations.append(Optimization(
+                id=str(uuid.uuid4()),
+                chunk_id=chunk_id,
+                type="redundancy",
+                priority="high" if metrics.redundancy_score > 0.7 else "medium",
+                title="Redundant content detected",
+                description=f"Redundancy score is {metrics.redundancy_score:.2f}, indicating significant repetitive content",
+                suggested_action="Remove or consolidate redundant information to improve efficiency",
+                created_at=datetime.utcnow()
+            ))
+        
+        if options.check_size and metrics.size_score < 0.5:
+            optimizations.append(Optimization(
+                id=str(uuid.uuid4()),
+                chunk_id=chunk_id,
+                type="size",
+                priority="medium",
+                title="Chunk size is suboptimal",
+                description=f"Size score is {metrics.size_score:.2f}, indicating the chunk may be too short or too long",
+                suggested_action="Adjust chunk size to optimal range (300-1000 characters)",
+                created_at=datetime.utcnow()
+            ))
+        
+        if options.check_similarity and metrics.similarity_score > 0.85:
+            optimizations.append(Optimization(
+                id=str(uuid.uuid4()),
+                chunk_id=chunk_id,
+                type="similarity",
+                priority="high",
+                title="Highly similar content detected",
+                description=f"Similarity score is {metrics.similarity_score:.2f}, indicating potential duplicate content",
+                suggested_action="Review and merge with similar chunks to avoid redundancy",
+                created_at=datetime.utcnow()
+            ))
+        
+        return optimizations
+    
+    def _create_empty_optimization(self, chunk_id: str) -> Optimization:
+        """Create an empty optimization when no issues are found"""
+        return Optimization(
+            id=str(uuid.uuid4()),
+            chunk_id=chunk_id,
+            type="info",
+            priority="low",
+            title="No optimization needed",
+            description="This chunk meets all quality standards",
+            suggested_action="No action required",
+            created_at=datetime.utcnow(),
+            status="applied"
+        )
