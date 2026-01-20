@@ -8,6 +8,7 @@ class AnalyzeChunkRequest(BaseModel):
     chunk_id: str = Field(..., description="Chunk unique identifier")
     content: str = Field(..., description="Chunk content")
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Chunk metadata")
+    domain: Optional[str] = Field(default="default", description="Domain configuration: default, operations, ecommerce, medical")
 
 
 class Metrics(BaseModel):
@@ -55,6 +56,7 @@ class AnalyzeDocumentRequest(BaseModel):
     document_id: str = Field(..., description="Document unique identifier")
     chunks: List[Chunk]
     options: Optional[AnalysisOptions] = Field(default_factory=AnalysisOptions)
+    domain: Optional[str] = Field(default="default", description="Domain configuration: default, operations, ecommerce, medical")
 
 
 class OptimizationListResponse(BaseModel):
@@ -73,6 +75,7 @@ class AnalyzeBatchRequest(BaseModel):
     batch_id: str = Field(..., description="Batch unique identifier")
     items: List[BatchItem]
     options: Optional[AnalysisOptions] = Field(default_factory=AnalysisOptions)
+    domain: Optional[str] = Field(default="default", description="Domain configuration: default, operations, ecommerce, medical")
 
 
 class BatchOptimizationResponse(BaseModel):

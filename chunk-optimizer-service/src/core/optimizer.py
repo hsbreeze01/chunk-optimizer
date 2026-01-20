@@ -18,6 +18,11 @@ from ..algorithms.quality_analyzer import QualityAnalyzer
 from ..algorithms.redundancy_detector import RedundancyDetector
 from ..algorithms.size_analyzer import SizeAnalyzer
 from ..algorithms.similarity_calculator import SimilarityCalculator
+from ..config.domain_config import (
+    get_domain_config,
+    calculate_overall_score,
+    get_optimization_priority
+)
 
 
 class Optimizer:
@@ -33,13 +38,21 @@ class Optimizer:
         self,
         chunk_id: str,
         content: str,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        domain: str = "default"
     ) -> OptimizationResponse:
         """Analyze a single chunk"""
-        logger.info(f"Analyzing chunk: {chunk_id}")
+        logger.info(f"Analyzing chunk: {chunk_id} with domain: {domain}")
         
-        metrics = self._calculate_metrics(chunk_id, content)
-        optimizations = self._generate_optimizations(chunk_id, content, metrics)
+        config = get_domain_config(domain)
+        metrics = self._calculate_metrics(chunk_id, content, config)
+        optimizations = self._generate_optimizations(
+            chunk_id,
+            content,
+            metrics,
+            config,
+            AnalysisOptions()
+        )
         
         return OptimizationResponse(
             optimization=optimizations[0] if optimizations else self._create_empty_optimization(chunk_id),
@@ -50,21 +63,24 @@ class Optimizer:
         self,
         document_id: str,
         chunks: List[Chunk],
-        options: Optional[AnalysisOptions] = None
+        options: Optional[AnalysisOptions] = None,
+        domain: str = "default"
     ) -> OptimizationListResponse:
         """Analyze all chunks in a document"""
-        logger.info(f"Analyzing document: {document_id} with {len(chunks)} chunks")
+        logger.info(f"Analyzing document: {document_id} with {len(chunks)} chunks and domain: {domain}")
         
         options = options or AnalysisOptions()
+        config = get_domain_config(domain)
         all_optimizations = []
         high_priority_count = 0
         
         for chunk in chunks:
-            metrics = self._calculate_metrics(chunk.chunk_id, chunk.content)
+            metrics = self._calculate_metrics(chunk.chunk_id, chunk.content, config)
             optimizations = self._generate_optimizations(
                 chunk.chunk_id,
                 chunk.content,
                 metrics,
+                config,
                 options
             )
             
@@ -83,21 +99,24 @@ class Optimizer:
         self,
         batch_id: str,
         items: List[BatchItem],
-        options: Optional[AnalysisOptions] = None
+        options: Optional[AnalysisOptions] = None,
+        domain: str = "default"
     ) -> BatchOptimizationResponse:
         """Batch analyze chunks"""
-        logger.info(f"Analyzing batch: {batch_id} with {len(items)} items")
+        logger.info(f"Analyzing batch: {batch_id} with {len(items)} items and domain: {domain}")
         
         options = options or AnalysisOptions()
+        config = get_domain_config(domain)
         processed = 0
         results = []
         
         for item in items:
-            metrics = self._calculate_metrics(item.chunk_id, item.content)
+            metrics = self._calculate_metrics(item.chunk_id, item.content, config)
             optimizations = self._generate_optimizations(
                 item.chunk_id,
                 item.content,
                 metrics,
+                config,
                 options
             )
             
@@ -120,18 +139,19 @@ class Optimizer:
             total=len(items)
         )
     
-    def _calculate_metrics(self, chunk_id: str, content: str) -> Metrics:
-        """Calculate quality metrics for a chunk"""
+    def _calculate_metrics(self, chunk_id: str, content: str, config) -> Metrics:
+        """Calculate quality metrics for a chunk using domain configuration"""
         quality_score = self.quality_analyzer.analyze(content)
         redundancy_score = self.redundancy_detector.analyze(content)
         size_score = self.size_analyzer.analyze(content)
         similarity_score = self.similarity_calculator.analyze(content)
         
-        overall_score = (
-            quality_score * 0.4 +
-            (1 - redundancy_score) * 0.3 +
-            size_score * 0.2 +
-            (1 - similarity_score) * 0.1
+        overall_score = calculate_overall_score(
+            quality_score,
+            redundancy_score,
+            size_score,
+            similarity_score,
+            config
         )
         
         return Metrics(
@@ -148,59 +168,82 @@ class Optimizer:
         chunk_id: str,
         content: str,
         metrics: Metrics,
+        config,
         options: Optional[AnalysisOptions] = None
     ) -> List[Optimization]:
-        """Generate optimization suggestions based on metrics"""
+        """Generate optimization suggestions based on metrics using domain configuration"""
         options = options or AnalysisOptions()
         optimizations = []
         
-        if options.check_quality and metrics.quality_score < 0.6:
-            optimizations.append(Optimization(
-                id=str(uuid.uuid4()),
-                chunk_id=chunk_id,
-                type="quality",
-                priority="high" if metrics.quality_score < 0.4 else "medium",
-                title="Chunk quality needs improvement",
-                description=f"Quality score is {metrics.quality_score:.2f}, which is below the recommended threshold of 0.6",
-                suggested_action="Review and rewrite the chunk to improve clarity, coherence, and completeness",
-                created_at=datetime.utcnow()
-            ))
+        if options.check_quality:
+            priority = get_optimization_priority(
+                metrics.quality_score,
+                config.quality_threshold
+            )
+            if priority in ["HIGH", "MEDIUM"]:
+                optimizations.append(Optimization(
+                    id=str(uuid.uuid4()),
+                    chunk_id=chunk_id,
+                    type="quality",
+                    priority=priority,
+                    title="Chunk quality needs improvement",
+                    description=f"Quality score is {metrics.quality_score:.2f}, which is below the recommended threshold of {config.quality_threshold}",
+                    suggested_action="Review and rewrite the chunk to improve clarity, coherence, and completeness",
+                    created_at=datetime.utcnow()
+                ))
         
-        if options.check_redundancy and metrics.redundancy_score > 0.5:
-            optimizations.append(Optimization(
-                id=str(uuid.uuid4()),
-                chunk_id=chunk_id,
-                type="redundancy",
-                priority="high" if metrics.redundancy_score > 0.7 else "medium",
-                title="Redundant content detected",
-                description=f"Redundancy score is {metrics.redundancy_score:.2f}, indicating significant repetitive content",
-                suggested_action="Remove or consolidate redundant information to improve efficiency",
-                created_at=datetime.utcnow()
-            ))
+        if options.check_redundancy:
+            priority = get_optimization_priority(
+                metrics.redundancy_score,
+                config.redundancy_threshold,
+                high_threshold=config.redundancy_threshold * 1.2
+            )
+            if priority in ["HIGH", "MEDIUM"]:
+                optimizations.append(Optimization(
+                    id=str(uuid.uuid4()),
+                    chunk_id=chunk_id,
+                    type="redundancy",
+                    priority=priority,
+                    title="Redundant content detected",
+                    description=f"Redundancy score is {metrics.redundancy_score:.2f}, indicating significant repetitive content",
+                    suggested_action="Remove or consolidate redundant information to improve efficiency",
+                    created_at=datetime.utcnow()
+                ))
         
-        if options.check_size and metrics.size_score < 0.5:
-            optimizations.append(Optimization(
-                id=str(uuid.uuid4()),
-                chunk_id=chunk_id,
-                type="size",
-                priority="medium",
-                title="Chunk size is suboptimal",
-                description=f"Size score is {metrics.size_score:.2f}, indicating the chunk may be too short or too long",
-                suggested_action="Adjust chunk size to optimal range (300-1000 characters)",
-                created_at=datetime.utcnow()
-            ))
+        if options.check_size:
+            priority = get_optimization_priority(
+                metrics.size_score,
+                config.size_threshold
+            )
+            if priority in ["HIGH", "MEDIUM"]:
+                optimizations.append(Optimization(
+                    id=str(uuid.uuid4()),
+                    chunk_id=chunk_id,
+                    type="size",
+                    priority=priority,
+                    title="Chunk size is suboptimal",
+                    description=f"Size score is {metrics.size_score:.2f}, indicating chunk may be too short or too long",
+                    suggested_action=f"Adjust chunk size to optimal range ({config.optimal_length[0]}-{config.optimal_length[1]} characters)",
+                    created_at=datetime.utcnow()
+                ))
         
-        if options.check_similarity and metrics.similarity_score > 0.85:
-            optimizations.append(Optimization(
-                id=str(uuid.uuid4()),
-                chunk_id=chunk_id,
-                type="similarity",
-                priority="high",
-                title="Highly similar content detected",
-                description=f"Similarity score is {metrics.similarity_score:.2f}, indicating potential duplicate content",
-                suggested_action="Review and merge with similar chunks to avoid redundancy",
-                created_at=datetime.utcnow()
-            ))
+        if options.check_similarity:
+            priority = get_optimization_priority(
+                metrics.similarity_score,
+                config.similarity_threshold,
+                high_threshold=config.similarity_threshold * 1.1
+            )
+            if priority in ["HIGH", "MEDIUM"]:
+                optimizations.append(Optimization(
+                    id=str(uuid.uuid4()),
+                    chunk_id=chunk_id,
+                    type="similarity",
+                    priority=priority,
+                    title="Highly similar content detected",
+                    description=f"Similarity score is {metrics.similarity_score:.2f}, indicating potential duplicate content",
+                    suggested_action="Review and merge with similar chunks to avoid redundancy",
+                    created_at=datetime.utcnow()
+                ))
         
         return optimizations
     
