@@ -1,13 +1,13 @@
 """Similarity calculator for chunks"""
 import re
-from typing import List, Set
+from typing import List, Set, Optional
 from collections import Counter
 
 
 class SimilarityCalculator:
     """Calculate similarity between chunks"""
     
-    def __init__(self):
+    def __init__(self, config: Optional = None):
         self.stop_words = {
             'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
             'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'be',
@@ -18,6 +18,9 @@ class SimilarityCalculator:
             '一个', '上', '也', '很', '到', '说', '要', '去', '你', '会', '着', '没有',
             '看', '好', '自己', '这'
         }
+        
+        # Pre-compile regex pattern for performance
+        self.word_pattern = re.compile(r'\b\w+\b')
     
     def analyze(self, content: str) -> float:
         """Analyze similarity and return score (0-1)"""
@@ -33,7 +36,7 @@ class SimilarityCalculator:
     
     def _extract_words(self, content: str) -> List[str]:
         """Extract meaningful words from content"""
-        words = re.findall(r'\b\w+\b', content.lower())
+        words = self.word_pattern.findall(content.lower())
         return [w for w in words if w not in self.stop_words and len(w) > 1]
     
     def _calculate_internal_similarity(self, words: List[str]) -> float:
@@ -41,6 +44,7 @@ class SimilarityCalculator:
         if len(words) < 5:
             return 0.0
         
+        # Optimized: Use Counter for efficient counting
         word_counts = Counter(words)
         repeated_words = {w: c for w, c in word_counts.items() if c >= 2}
         

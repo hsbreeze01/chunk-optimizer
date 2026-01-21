@@ -1,15 +1,30 @@
 """Quality analyzer for chunks"""
 import re
-from typing import List
+from typing import List, Optional
+from config.domain_config import DomainConfig
 
 
 class QualityAnalyzer:
     """Analyze chunk quality"""
     
-    def __init__(self):
-        self.min_length = 50
-        self.max_length = 2000
-        self.optimal_length = (300, 1000)
+    def __init__(self, config: Optional[DomainConfig] = None):
+        if config is None:
+            config = DomainConfig()
+        
+        self.min_length = config.min_length
+        self.max_length = config.max_length
+        self.optimal_length = config.optimal_length
+        
+        # Pre-compile regex patterns for performance
+        self.sentence_pattern = re.compile(r'[.!?]+')
+        self.word_pattern = re.compile(r'\b\w+\b')
+        self.transition_words = [
+            'however', 'therefore', 'consequently', 'furthermore',
+            'moreover', 'in addition', 'meanwhile', 'otherwise',
+            'thus', 'hence', 'accordingly', 'nevertheless',
+            '但是', '因此', '所以', '此外', '而且', '同时', '否则',
+            '于是', '从而', '然而', '不过'
+        ]
     
     def analyze(self, content: str) -> float:
         """Analyze chunk quality and return score (0-1)"""
@@ -40,7 +55,7 @@ class QualityAnalyzer:
     
     def _analyze_sentence_structure(self, content: str) -> float:
         """Analyze sentence structure"""
-        sentences = re.split(r'[.!?]+', content)
+        sentences = self.sentence_pattern.split(content)
         sentences = [s.strip() for s in sentences if s.strip()]
         
         if not sentences:
@@ -57,7 +72,7 @@ class QualityAnalyzer:
     
     def _analyze_vocabulary(self, content: str) -> float:
         """Analyze vocabulary diversity"""
-        words = re.findall(r'\b\w+\b', content.lower())
+        words = self.word_pattern.findall(content.lower())
         
         if not words:
             return 0.0
@@ -74,7 +89,7 @@ class QualityAnalyzer:
     
     def _analyze_coherence(self, content: str) -> float:
         """Analyze text coherence"""
-        sentences = re.split(r'[.!?]+', content)
+        sentences = self.sentence_pattern.split(content)
         sentences = [s.strip() for s in sentences if s.strip()]
         
         if len(sentences) < 2:
@@ -82,16 +97,8 @@ class QualityAnalyzer:
         
         coherence_score = 0.8
         
-        transition_words = [
-            'however', 'therefore', 'consequently', 'furthermore',
-            'moreover', 'in addition', 'meanwhile', 'otherwise',
-            'thus', 'hence', 'accordingly', 'nevertheless',
-            '但是', '因此', '所以', '此外', '而且', '同时', '否则',
-            '于是', '从而', '然而', '不过'
-        ]
-        
         has_transitions = any(
-            any(word in sentence.lower() for word in transition_words)
+            any(word in sentence.lower() for word in self.transition_words)
             for sentence in sentences
         )
         

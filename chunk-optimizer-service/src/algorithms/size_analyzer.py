@@ -1,14 +1,19 @@
 """Size analyzer for chunks"""
+from typing import Optional
+from config.domain_config import DomainConfig
 
 
 class SizeAnalyzer:
     """Analyze chunk size"""
     
-    def __init__(self):
-        self.min_length = 50
-        self.max_length = 2000
-        self.optimal_min = 300
-        self.optimal_max = 1000
+    def __init__(self, config: Optional[DomainConfig] = None):
+        if config is None:
+            config = DomainConfig()
+        
+        self.min_length = config.min_length
+        self.max_length = config.max_length
+        self.optimal_min = config.optimal_length[0]
+        self.optimal_max = config.optimal_length[1]
     
     def analyze(self, content: str) -> float:
         """Analyze chunk size and return score (0-1)"""

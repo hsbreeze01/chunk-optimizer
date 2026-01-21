@@ -1,6 +1,7 @@
 """Domain-specific configurations for chunk optimization"""
 from pydantic import BaseModel
 from typing import Tuple
+from functools import lru_cache
 
 
 class DomainConfig(BaseModel):
@@ -48,10 +49,27 @@ class DomainConfig(BaseModel):
             "max_length": self.max_length,
             "optimal_length": self.optimal_length
         }
+    
+    def __hash__(self):
+        """Make DomainConfig hashable for caching"""
+        return hash((
+            self.quality_weight,
+            self.redundancy_weight,
+            self.size_weight,
+            self.similarity_weight,
+            self.quality_threshold,
+            self.redundancy_threshold,
+            self.size_threshold,
+            self.similarity_threshold,
+            self.min_length,
+            self.max_length,
+            self.optimal_length
+        ))
 
 
+@lru_cache(maxsize=10)
 def get_domain_config(domain: str) -> DomainConfig:
-    """Get domain-specific configuration"""
+    """Get domain-specific configuration with caching"""
     domain = domain.lower()
     
     if domain == "operations":
@@ -114,15 +132,6 @@ def get_domain_config(domain: str) -> DomainConfig:
     else:
         # 默认配置
         return DomainConfig()
-
-
-# 预定义的领域配置
-DOMAIN_CONFIGS = {
-    "default": DomainConfig(),
-    "operations": get_domain_config("operations"),
-    "ecommerce": get_domain_config("ecommerce"),
-    "medical": get_domain_config("medical")
-}
 
 
 def calculate_overall_score(
